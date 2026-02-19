@@ -81,7 +81,7 @@ function downloadPayslipPDF(entry: PayslipData) {
 
     const gold = [180, 140, 40] as [number, number, number];
     const black = [20, 20, 20] as [number, number, number];
-    const gray = [100, 100, 100] as [number, number, number];
+    // const gray = [100, 100, 100] as [number, number, number];
     const lightGray = [160, 160, 160] as [number, number, number];
     const red = [192, 57, 43] as [number, number, number];
     const bgGold = [255, 250, 230] as [number, number, number];
