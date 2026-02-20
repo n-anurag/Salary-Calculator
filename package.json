@@ -1,4 +1,10 @@
 {
+  "name": "salary-calculator-backend",
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch"
+  },
   "dependencies": {
     "@nestjs/common": "^11.1.14",
     "@nestjs/core": "^11.1.14",
@@ -6,6 +12,9 @@
     "bikram-sambat-js": "^1.0.3"
   },
   "devDependencies": {
+    "@nestjs/cli": "^10.0.0",
+    "@nestjs/schematics": "^10.0.0",
+    "typescript": "^5.0.0",
     "@vitejs/plugin-react": "^5.1.4"
   }
 }
