@@ -1,5 +1,1 @@
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}
+{"rootDirectory":"salary-calculator-frontend","rewrites":[{"source":"/(.*)","destination":"/index.html"}]}
