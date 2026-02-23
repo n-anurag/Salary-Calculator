@@ -18,6 +18,7 @@ interface SalaryResult {
   totalSalary: number;
   totalB: number;
   sst: number;
+  sstRate: number;
   netSalary: number;
   lunchTotal: number;
   accessoriesTotal: number;
@@ -171,10 +172,13 @@ function downloadPayslipPDF(entry: PayslipData) {
         ? { label: "Total PF (20%)", val: entry.result.totalContribution, type: "deduct" }
         : { label: "Employer SSF (20%)", val: entry.result.employerContribution, type: "deduct" },
       ...(!isPF ? [{ label: "Total SSF (31%)", val: entry.result.totalContribution, type: "total" as const }] : []),
-      
-      { label: "Total B (Taxable Base)", val: entry.result.totalB, type: "total" },
-      { label: "SST Deduction (1%)", val: entry.result.sst, type: "deduct" },
-      { label: "Net Salary", val: entry.result.netSalary, type: "total" },
+      { label: "Gross Salary", val: entry.result.totalB, type: "total" },
+      { label: `SST (${entry.result.sstRate}%)`, val: entry.result.sst, type: "deduct" },
+      {
+        label: isPF ? "Final Receivable" : "Net Salary",
+        val: isPF ? entry.result.finalPayable : entry.result.netSalary,
+        type: "total",
+      },
     ];
 
     rows.forEach((row) => {
@@ -235,7 +239,7 @@ function downloadPayslipPDF(entry: PayslipData) {
     doc.line(margin, y, W - margin, y);
     y += 6;
 
-    // Final payable / Net salary box
+    // Final payable box
     doc.setFillColor(...bgGold);
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.8);
@@ -243,10 +247,11 @@ function downloadPayslipPDF(entry: PayslipData) {
     doc.setTextColor(...black);
     doc.setFontSize(12);
     doc.setFont("helvetica", "bold");
-    doc.text(isPF ? "Net Salary (Receivable)" : "Final Payable", margin + 5, y + 10);
+    // PF → "Final Receivable", SSF → "Final Payable"
+    doc.text(isPF ? "Final Receivable" : "Final Payable", margin + 5, y + 10);
     doc.setFontSize(14);
     doc.setTextColor(140, 90, 10);
-    doc.text(fmtPDF(isPF ? entry.result.netSalary : entry.result.finalPayable), W - margin - 5, y + 10, { align: "right" });
+    doc.text(fmtPDF(entry.result.finalPayable), W - margin - 5, y + 10, { align: "right" });
 
     y += 26;
     doc.setDrawColor(220, 220, 220);
@@ -283,7 +288,7 @@ function DonutChart({ result }: { result: SalaryResult }) {
     { label: "Allowance", value: result.allowanceEarned, color: "#7c9fd4" },
     { label: isPF ? "Emp. PF" : "Emp. SSF", value: result.employeeContribution, color: "#8ecfb0" },
     { label: "SST", value: result.sst, color: "#f87171" },
-    { label: "Net Take-Home", value: result.netSalary, color: "#a78bfa" },
+    { label: isPF ? "Final Receivable" : "Net Take-Home", value: isPF ? result.finalPayable : result.netSalary, color: "#a78bfa" },
   ];
 
   const radius = 72; const cx = 92; const cy = 92;
@@ -326,13 +331,13 @@ function DonutChart({ result }: { result: SalaryResult }) {
           ))}
           <text x={cx} y={cy - 10} textAnchor="middle" fill="#f0ece0"
             style={{ fontFamily: "'Lora',serif", fontSize: 13, fontWeight: 600 }}>
-            {hovered !== null ? arcs[hovered].label : "Net Salary"}
+            {hovered !== null ? arcs[hovered].label : isPF ? "Final Receivable" : "Net Salary"}
           </text>
           <text x={cx} y={cy + 14} textAnchor="middle" fill="#d4af37"
             style={{ fontFamily: "'Lora',serif", fontSize: 12, fontWeight: 600 }}>
             {hovered !== null
               ? `${(arcs[hovered].pct * 100).toFixed(1)}%`
-              : `Rs.${fmtNum(result.netSalary)}`}
+              : `Rs.${fmtNum(isPF ? result.finalPayable : result.netSalary)}`}
           </text>
         </svg>
 
@@ -354,7 +359,7 @@ function DonutChart({ result }: { result: SalaryResult }) {
         {[
           { label: "Deduction Rate", val: `${(((result.totalContribution + result.sst) / result.totalSalary) * 100).toFixed(1)}%`, color: "#f87171" },
           { label: isPF ? "PF Contribution" : "SSF Contribution", val: `${((result.totalContribution / result.totalSalary) * 100).toFixed(1)}%`, color: "#8ecfb0" },
-          { label: "Take-Home Rate", val: `${((result.netSalary / result.totalSalary) * 100).toFixed(1)}%`, color: "#d4af37" },
+          { label: "Take-Home Rate", val: `${(((isPF ? result.finalPayable : result.netSalary) / result.totalSalary) * 100).toFixed(1)}%`, color: "#d4af37" },
         ].map((s, i) => (
           <div key={i} className="insight-stat-card">
             <p className="insight-stat-val" style={{ color: s.color }}>{s.val}</p>
@@ -388,9 +393,13 @@ function PayslipModal({ entry, onClose }: { entry: PayslipData; onClose: () => v
       ? { label: "Total PF (20%)", val: entry.result.totalContribution, type: "deduct" }
       : { label: "Employer SSF (20%)", val: entry.result.employerContribution, type: "deduct" },
     ...(!isPF ? [{ label: "Total SSF (31%)", val: entry.result.totalContribution, type: "total" }] : []),
-    { label: "Total B (Taxable Base)", val: entry.result.totalB, type: "total" },
-    { label: "SST (1%)", val: entry.result.sst, type: "deduct" },
-    { label: "Net Salary", val: entry.result.netSalary, type: "total" },
+    { label: "Gross Salary", val: entry.result.totalB, type: "total" },
+    { label: `SST (${entry.result.sstRate}%)`, val: entry.result.sst, type: "deduct" },
+    {
+      label: isPF ? "Final Receivable" : "Net Salary",
+      val: isPF ? entry.result.finalPayable : entry.result.netSalary,
+      type: "total",
+    },
   ];
 
   return (
@@ -466,8 +475,9 @@ function PayslipModal({ entry, onClose }: { entry: PayslipData; onClose: () => v
           )}
 
           <div className="payslip-net">
-            <span>{isPF ? "Net Salary (Receivable)" : "Final Payable"}</span>
-            <FmtAmount val={isPF ? entry.result.netSalary : entry.result.finalPayable} />
+            {/* PF → Final Receivable | SSF → Final Payable */}
+            <span>{isPF ? "Final Receivable" : "Final Payable"}</span>
+            <FmtAmount val={entry.result.finalPayable} />
           </div>
           <div className="payslip-footer">Computer-generated payslip — no signature required.</div>
         </div>
@@ -479,9 +489,9 @@ function PayslipModal({ entry, onClose }: { entry: PayslipData; onClose: () => v
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [form, setForm] = useState({
-    totalSalary: 70000,
+    totalSalary: 40000,
     totalDays: 30,
-    daysPresent: 28,
+    daysPresent: 30,
     contributionType: "PF",
     lunchPerDay: 0,
     companyWorkingDays: 0,
@@ -505,16 +515,15 @@ export default function Dashboard() {
     setMounted(true);
   }, []);
 
- const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-  const { name, value } = e.target;
-  const numericFields = ["totalSalary","totalDays","daysPresent","lunchPerDay","companyWorkingDays","petrol","dress","otherAccessory"];
-  setForm({
-    ...form,
-    [name]: numericFields.includes(name) ? (value === "" ? 0 : Number(value)) : value,
-  });
-  setValidationError("");
-  
-};
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    const numericFields = ["totalSalary","totalDays","daysPresent","lunchPerDay","companyWorkingDays","petrol","dress","otherAccessory"];
+    setForm({
+      ...form,
+      [name]: numericFields.includes(name) ? (value === "" ? 0 : Number(value)) : value,
+    });
+    setValidationError("");
+  };
 
   const handleCalculate = async () => {
     if (Number(form.daysPresent) > Number(form.totalDays)) {
@@ -751,7 +760,6 @@ export default function Dashboard() {
                   <input type="number" name="totalSalary" value={form.totalSalary} onChange={handleChange} />
                 </div>
 
-                {/* PF / SSF Toggle */}
                 <div className="field">
                   <label className="field-label">Contribution Type</label>
                   <div className="toggle-wrap">
@@ -798,14 +806,6 @@ export default function Dashboard() {
                       <label className="field-label">Lunch Per Day (रू)</label>
                       <input type="number" name="lunchPerDay" value={form.lunchPerDay} onChange={handleChange} />
                     </div>
-                    {/* <div className="field">
-                      <label className="field-label">Petrol (Monthly)</label>
-                      <input type="number" name="petrol" value={form.petrol} onChange={handleChange} />
-                    </div>
-                    <div className="field">
-                      <label className="field-label">Dress (Monthly)</label>
-                      <input type="number" name="dress" value={form.dress} onChange={handleChange} />
-                    </div> */}
                     <div className="field">
                       <label className="field-label">Other (Monthly)</label>
                       <input type="number" name="otherAccessory" value={form.otherAccessory} onChange={handleChange} />
@@ -833,7 +833,7 @@ export default function Dashboard() {
 
                   <div className="results-grid">
                     {isPF ? (
-                      // ── PF Results (original) ──
+                      // ── PF Results ──
                       <>
                         {[
                           { label: "Basic Earned", val: result.basicEarned, d: 0 },
@@ -844,7 +844,6 @@ export default function Dashboard() {
                           <div key={i} className="result-card" style={{ animationDelay: `${c.d}ms` }}>
                             <p className="result-label">{c.label}</p>
                             <p className="result-value"><FmtAmount val={c.val} /></p>
-                            
                           </div>
                         ))}
                         <div className="result-card col-span-2" style={{ animationDelay: "240ms" }}>
@@ -852,50 +851,40 @@ export default function Dashboard() {
                           <p className="result-value"><FmtAmount val={result.totalSalary} /></p>
                         </div>
                         <div className="result-card danger-card" style={{ animationDelay: "300ms" }}>
-                          <p className="result-label">SST Deduction (1%)</p>
+                          <p className="result-label">SST Deduction ({result.sstRate}%)</p>
                           <p className="result-value red"><FmtAmount val={result.sst} /></p>
                         </div>
                         <div className="result-card accent-card col-span-2" style={{ animationDelay: "360ms" }}>
-                          <p className="result-label">Net Salary — Receivable</p>
-                          <p className="result-value gold"><FmtAmount val={result.netSalary} /></p>
+                          <p className="result-label">Final Receivable</p>
+                          <p className="result-value gold"><FmtAmount val={result.finalPayable} /></p>
                         </div>
                       </>
                     ) : (
-                  // ── SSF Results (new) ──
-<>
-  {[
-    { label: "Basic Earned", val: result.basicEarned, d: 0 },
-    { label: "Allowance Earned", val: result.allowanceEarned, d: 60 },
-    { label: "Employee SSF (11%)", val: result.employeeContribution, d: 120 },
-    { label: "Employer SSF (20%)", val: result.employerContribution, d: 180 },
-  ].map((c, i) => (
-    <div key={i} className="result-card" style={{ animationDelay: `${c.d}ms` }}>
-      <p className="result-label">{c.label}</p>
-      <p className="result-value"><FmtAmount val={c.val} /></p>
-    </div>
-  ))}
-
-  {/* Total SSF and SST side by side */}
-  <div className="result-card" style={{ animationDelay: "210ms" }}>
-    <p className="result-label">Total SSF (31%)</p>
-    <p className="result-value"><FmtAmount val={result.totalContribution} /></p>
-  </div>
-  <div className="result-card danger-card" style={{ animationDelay: "240ms" }}>
-    <p className="result-label">SST (1%)</p>
-    <p className="result-value red"><FmtAmount val={result.sst} /></p>
-  </div>
-                        <div className="result-card col-span-2" style={{ animationDelay: "240ms" }}>
+                      // ── SSF Results ──
+                      <>
+                        {[
+                          { label: "Basic Earned", val: result.basicEarned, d: 0 },
+                          { label: "Allowance Earned", val: result.allowanceEarned, d: 60 },
+                          { label: "Employee SSF (11%)", val: result.employeeContribution, d: 120 },
+                          { label: "Employer SSF (20%)", val: result.employerContribution, d: 180 },
+                        ].map((c, i) => (
+                          <div key={i} className="result-card" style={{ animationDelay: `${c.d}ms` }}>
+                            <p className="result-label">{c.label}</p>
+                            <p className="result-value"><FmtAmount val={c.val} /></p>
+                          </div>
+                        ))}
+                        <div className="result-card" style={{ animationDelay: "210ms" }}>
+                          <p className="result-label">Total SSF (31%)</p>
+                          <p className="result-value"><FmtAmount val={result.totalContribution} /></p>
+                        </div>
+                        <div className="result-card danger-card" style={{ animationDelay: "240ms" }}>
+                          <p className="result-label">SST ({result.sstRate}%)</p>
+                          <p className="result-value red"><FmtAmount val={result.sst} /></p>
+                        </div>
+                        <div className="result-card col-span-2" style={{ animationDelay: "270ms" }}>
                           <p className="result-label">Gross Salary</p>
                           <p className="result-value"><FmtAmount val={result.totalSalary} /></p>
                         </div>
-                        {/* <div className="result-card" style={{ animationDelay: "270ms" }}>
-                          <p className="result-label">Total B (Taxable Base)</p>
-                          <p className="result-value"><FmtAmount val={result.totalB} /></p>
-                        </div> */}
-                        {/* <div className="result-card danger-card" style={{ animationDelay: "300ms" }}>
-                          <p className="result-label">SST (1%)</p>
-                          <p className="result-value red"><FmtAmount val={result.sst} /></p>
-                        </div> */}
                         <div className="result-card col-span-2" style={{ animationDelay: "330ms" }}>
                           <p className="result-label">Net Salary</p>
                           <p className="result-value"><FmtAmount val={result.netSalary} /></p>
